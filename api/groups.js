@@ -13,19 +13,19 @@ module.exports = async (req, res) => {
 
     const token = tokenRes.data.access_token;
 
-    const unitsRes = await axios.get("https://api.competitionsuite.com/v3/units", {
+    const groupsRes = await axios.get("https://api.competitionsuite.com/v3/groups", {
       headers: {
         Authorization: `Bearer ${token}`,
       },
     });
 
-    res.status(200).json(unitsRes.data);
+    res.status(200).json(groupsRes.data);
   } catch (err) {
-    console.error("Error fetching units:", {
+    console.error("Error fetching groups:", {
       message: err.message,
       status: err.response?.status,
       data: err.response?.data
     });
-    res.status(500).json({ error: "Failed to fetch units" });
-    }
+    res.status(500).json({ error: "Failed to fetch groups" });
+  }
 };
