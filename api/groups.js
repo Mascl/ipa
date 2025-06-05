@@ -22,6 +22,8 @@ module.exports = async (req, res) => {
       },
     });
 
+    console.log("Fetched groups:", groupsRes.data);
+
     res.status(200).json(groupsRes.data);
   } catch (err) {
     console.error("Error fetching groups:", {
