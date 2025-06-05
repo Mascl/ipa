@@ -21,7 +21,11 @@ module.exports = async (req, res) => {
 
     res.status(200).json(unitsRes.data);
   } catch (err) {
-    console.error("Error fetching units:", err.response?.data || err.message);
+    console.error("Error fetching units:", {
+      message: err.message,
+      status: err.response?.status,
+      data: err.response?.data
+    });
     res.status(500).json({ error: "Failed to fetch units" });
-  }
+    }
 };
