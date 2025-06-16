@@ -32,8 +32,6 @@ module.exports = async (req, res) => {
 
     console.log("Group performances:", eventsRes.data); // <–– add this
     res.status(200).json(eventsRes.data);
-
-    res.status(200).json(eventsRes.data);
   } catch (err) {
     console.error("Error fetching group events:", {
       message: err.message,
