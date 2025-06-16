@@ -22,7 +22,7 @@ module.exports = async (req, res) => {
     const token = tokenRes.data.access_token;
 
     const eventsRes = await axios.get(
-      `https://api.competitionsuite.com/v3/groups/${groupId}/performances`,
+      `https://api.competitionsuite.com/v3/groups/${groupId}/events`,
       {
         headers: {
           Authorization: `Bearer ${token}`,
