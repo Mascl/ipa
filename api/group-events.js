@@ -6,6 +6,7 @@ const CLIENT_SECRET = process.env.CLIENT_SECRET;
 module.exports = async (req, res) => {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "GET");
+  res.setHeader("Cache-Control", "no-store");
 
   const groupId = req.query.id;
   if (!groupId) {
