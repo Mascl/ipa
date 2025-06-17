@@ -30,7 +30,9 @@ module.exports = async (req, res) => {
     const headers = { Authorization: `Bearer ${token}` };
 
     const seasonsRes = await axios.get("https://api.competitionsuite.com/v3/seasons", { headers });
-    const seasons = seasonsRes.data.data.slice(0, 1);
+    const seasons = seasonsRes.data.data
+      .sort((a, b) => b.name.localeCompare(a.name))
+      .slice(0, 1);
 
     const eventsBySeason = await Promise.all(
       seasons.map(async season => {
