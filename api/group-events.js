@@ -24,8 +24,8 @@ module.exports = async (req, res) => {
 
     const token = tokenRes.data.access_token;
 
-    const eventsRes = await axios.get(
-      `https://api.competitionsuite.com/v3/groups/${groupId}/events`,
+    const performancesRes = await axios.get(
+      `https://api.competitionsuite.com/v3/groups/${groupId}/performances`,
       {
         headers: {
           Authorization: `Bearer ${token}`,
@@ -33,13 +33,13 @@ module.exports = async (req, res) => {
       }
     );
 
-    res.status(200).json(eventsRes.data);
+    res.status(200).json(performancesRes.data);
   } catch (err) {
-    console.error("Error fetching group events:", {
+    console.error("Error fetching group performances:", {
       message: err.message,
       status: err.response?.status,
       data: err.response?.data,
     });
-    res.status(500).json({ error: "Failed to fetch group events" });
+    res.status(500).json({ error: "Failed to fetch group performances" });
   }
 };
