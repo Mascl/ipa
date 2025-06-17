@@ -30,7 +30,7 @@ module.exports = async (req, res) => {
     const headers = { Authorization: `Bearer ${token}` };
 
     const seasonsRes = await axios.get("https://api.competitionsuite.com/v3/seasons", { headers });
-    const seasons = seasonsRes.data.slice(0, 1); // limit to latest season for performance
+    const seasons = seasonsRes.data.data.slice(0, 1);
 
     const eventsBySeason = await Promise.all(
       seasons.map(async season => {
