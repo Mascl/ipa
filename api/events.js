@@ -31,9 +31,7 @@ module.exports = async (req, res) => {
       `https://api.competitionsuite.com/v3/events`,
       {
         headers: {
-          Authorization: `Bearer ${token}`,
-          accept: 'application/json',
-          Accepts: 'application/json'
+          Authorization: `Bearer ${token}`
         }
       }
     );
