@@ -70,13 +70,15 @@ module.exports = async (req, res) => {
 
             const firstComp = eventDetail.competitions[0];
             const date = firstComp?.date ?? null;
+            const recapUrl = firstComp?.recapUrl ?? null;
 
             return {
               id: e.id,
               name: e.name,
               location: e.location,
               season: season.name,
-              date
+              date,
+              recapUrl
             };
           } catch (err) {
             console.warn(`Error loading event ${e.id}`, err.response?.data || err.message);
