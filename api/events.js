@@ -49,8 +49,13 @@ module.exports = async (req, res) => {
               { headers }
             );
 
-            const eventDetail = eventDetailRes.data.data;
-            const firstComp = eventDetail.competitions?.[0];
+            const eventDetail = eventDetailRes?.data?.data;
+
+            if (!eventDetail || !Array.isArray(eventDetail.competitions)) {
+              throw new Error("Missing or malformed event.competitions");
+            }
+
+            const firstComp = eventDetail.competitions[0];
             const date = firstComp?.date ?? null;
 
             return {
@@ -61,7 +66,7 @@ module.exports = async (req, res) => {
               date
             };
           } catch (err) {
-            console.warn(`Error loading event ${e.id}: ${err.message}`);
+            console.warn(`Error loading event ${e.id}`, err.response?.data || err.message);
             return {
               id: e.id,
               name: e.name,
