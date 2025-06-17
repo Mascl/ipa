@@ -49,7 +49,7 @@ module.exports = async (req, res) => {
               { headers }
             );
 
-            const eventDetail = eventDetailRes?.data?.data;
+            const eventDetail = eventDetailRes?.data;
 
             if (!eventDetail || !Array.isArray(eventDetail.competitions)) {
               throw new Error("Missing or malformed event.competitions");
