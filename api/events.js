@@ -56,6 +56,10 @@ module.exports = async (req, res) => {
               `https://api.competitionsuite.com/v3/events/${e.id}/competitions/${comp.id}/schedule`,
               { headers }
             );
+
+            console.log(`Event ${e.id} – comps: ${comps.length}`);
+            console.log(`Schedule for comp ${comp.id}:`, schedRes.data);
+
             const times = schedRes.data.map(s => s.start_time);
             const date = times.length ? times.sort()[0] : null;
 
