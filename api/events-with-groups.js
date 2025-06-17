@@ -1,6 +1,6 @@
 const axios = require("axios");
 const cheerio = require("cheerio");
-const pLimit = require("p-limit");
+const pLimit = (await import("p-limit")).default;
 
 const CLIENT_ID = process.env.CLIENT_ID;
 const CLIENT_SECRET = process.env.CLIENT_SECRET;
@@ -49,6 +49,8 @@ async function scrapeGroupsFromSchedule(url) {
 }
 
 module.exports = async (req, res) => {
+  const pLimit = (await import("p-limit")).default;
+  
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "GET");
   res.setHeader("Cache-Control", "no-store");
