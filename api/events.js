@@ -1,3 +1,5 @@
+console.log("🟡 /api/events.js function triggered");
+
 const axios = require("axios");
 
 const CLIENT_ID = process.env.CLIENT_ID;
