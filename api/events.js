@@ -28,11 +28,13 @@ module.exports = async (req, res) => {
     const token = tokenRes.data.access_token;
 
     const eventsRes = await axios.get(
-      `https://api.competitionsuite.com/v3/circuits/${CIRCUIT_ID}/events`,
+      `https://api.competitionsuite.com/v3/events`,
       {
         headers: {
           Authorization: `Bearer ${token}`,
-        },
+          accept: 'application/json',
+          Accepts: 'application/json'
+        }
       }
     );
 
