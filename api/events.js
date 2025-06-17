@@ -2,11 +2,16 @@ const axios = require("axios");
 
 const CLIENT_ID = process.env.CLIENT_ID;
 const CLIENT_SECRET = process.env.CLIENT_SECRET;
+const CIRCUIT_ID = process.env.CIRCUIT_ID; // <-- Set this in Vercel's Environment Variables
 
 module.exports = async (req, res) => {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "GET");
   res.setHeader("Cache-Control", "no-store");
+
+  if (!CIRCUIT_ID) {
+    return res.status(500).json({ error: "Missing CIRCUIT_ID environment variable" });
+  }
 
   try {
     const tokenRes = await axios.post(
@@ -21,7 +26,7 @@ module.exports = async (req, res) => {
     const token = tokenRes.data.access_token;
 
     const eventsRes = await axios.get(
-      "https://api.competitionsuite.com/v3/events",
+      `https://api.competitionsuite.com/v3/circuits/${CIRCUIT_ID}/events`,
       {
         headers: {
           Authorization: `Bearer ${token}`,
