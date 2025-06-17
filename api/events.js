@@ -38,7 +38,7 @@ module.exports = async (req, res) => {
           `https://api.competitionsuite.com/v3/events?seasonId=${season.id}`,
           { headers }
         );
-        const events = evRes.data;
+        const events = evRes.data.data;
 
         const enriched = await Promise.all(events.map(async e => {
           try {
