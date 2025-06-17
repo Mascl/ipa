@@ -44,26 +44,14 @@ module.exports = async (req, res) => {
 
         const enriched = await Promise.all(events.map(async e => {
           try {
-            const compsRes = await axios.get(
-              `https://api.competitionsuite.com/v3/events/${e.id}/competitions`,
-              { headers }
-            );
-            const comps = compsRes.data;
-            if (!Array.isArray(comps) || comps.length === 0) {
-              return { id: e.id, name: e.name, location: e.location, season: season.name, date: null };
-            }
-
-            const comp = comps[0];
-            const schedRes = await axios.get(
-              `https://api.competitionsuite.com/v3/events/${e.id}/competitions/${comp.id}/schedule`,
+            const eventDetailRes = await axios.get(
+              `https://api.competitionsuite.com/v3/events/${e.id}`,
               { headers }
             );
 
-            console.log(`Event ${e.id} – comps: ${comps.length}`);
-            console.log(`Schedule for comp ${comp.id}:`, schedRes.data);
-
-            const times = schedRes.data.map(s => s.start_time);
-            const date = times.length ? times.sort()[0] : null;
+            const eventDetail = eventDetailRes.data.data;
+            const firstComp = eventDetail.competitions?.[0];
+            const date = firstComp?.date ?? null;
 
             return {
               id: e.id,
@@ -73,7 +61,7 @@ module.exports = async (req, res) => {
               date
             };
           } catch (err) {
-            console.warn(`Error loading data for event ${e.id}: ${err.message}`);
+            console.warn(`Error loading event ${e.id}: ${err.message}`);
             return {
               id: e.id,
               name: e.name,
