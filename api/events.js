@@ -31,13 +31,23 @@ module.exports = async (req, res) => {
           `https://api.competitionsuite.com/v3/events/${e.id}/competitions`,
           { headers }
         );
-        const comp = compsRes.data[0]; // pick first competition
-        const sched = await axios.get(
-          `https://api.competitionsuite.com/v3/events/${e.id}/competitions/${comp.id}/schedule`,
-          { headers }
-        );
-        const times = sched.data.map(s => s.start_time);
-        const date = times.length ? times.sort()[0] : null;
+        const comps = compsRes.data;
+        if (!Array.isArray(comps) || comps.length === 0) {
+          return { id: e.id, name: e.name, location: e.location, season: season.name, date: null };
+        }
+        const comp = comps[0];
+
+        let date = null;
+        try {
+          const schedRes = await axios.get(
+            `https://api.competitionsuite.com/v3/events/${e.id}/competitions/${comp.id}/schedule`,
+            { headers }
+          );
+          const times = schedRes.data.map(s => s.start_time);
+          date = times.length ? times.sort()[0] : null;
+        } catch (err) {
+          console.warn(`Could not get schedule for event ${e.id}: ${err.message}`);
+        }
         return { id: e.id, name: e.name, location: e.location, season: season.name, date };
       }));
       return enriched;
