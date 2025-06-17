@@ -6,7 +6,6 @@ const CLIENT_SECRET = process.env.CLIENT_SECRET;
 module.exports = async (req, res) => {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "GET");
-  res.setHeader("Cache-Control", "no-store");
 
   const groupId = req.query.id;
   if (!groupId) {
@@ -14,11 +13,14 @@ module.exports = async (req, res) => {
   }
 
   try {
-    const tokenRes = await axios.post("https://api.competitionsuite.com/v3/oauth2/token", new URLSearchParams({
-      grant_type: "client_credentials",
-      client_id: CLIENT_ID,
-      client_secret: CLIENT_SECRET,
-    }));
+    const tokenRes = await axios.post(
+      "https://api.competitionsuite.com/v3/oauth2/token",
+      new URLSearchParams({
+        grant_type: "client_credentials",
+        client_id: CLIENT_ID,
+        client_secret: CLIENT_SECRET,
+      })
+    );
 
     const token = tokenRes.data.access_token;
 
@@ -31,7 +33,6 @@ module.exports = async (req, res) => {
       }
     );
 
-    console.log("Group performances:", eventsRes.data); // <–– add this
     res.status(200).json(eventsRes.data);
   } catch (err) {
     console.error("Error fetching group events:", {
