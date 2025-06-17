@@ -38,7 +38,7 @@ module.exports = async (req, res) => {
         `https://api.competitionsuite.com/v3/seasons/${seasonId}`,
         { headers }
       );
-      seasons = [seasonRes.data.data];
+      seasons = [seasonRes.data];
     } else {
       // Default: use most recent season
       const seasonsRes = await axios.get("https://api.competitionsuite.com/v3/seasons", { headers });
