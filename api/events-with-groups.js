@@ -1,6 +1,5 @@
 const axios = require("axios");
 const cheerio = require("cheerio");
-const pLimit = (await import("p-limit")).default;
 
 const CLIENT_ID = process.env.CLIENT_ID;
 const CLIENT_SECRET = process.env.CLIENT_SECRET;
@@ -49,8 +48,8 @@ async function scrapeGroupsFromSchedule(url) {
 }
 
 module.exports = async (req, res) => {
-  const pLimit = (await import("p-limit")).default;
-  
+  const { default: pLimit } = await import("p-limit");
+
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "GET");
   res.setHeader("Cache-Control", "no-store");
@@ -62,7 +61,7 @@ module.exports = async (req, res) => {
     const season = await getMostRecentSeason(headers);
     const events = await getEvents(season.id, headers);
 
-    const limit = pLimit(3); // max 3 concurrent requests
+    const limit = pLimit(3);
 
     const results = await Promise.all(events.map(event =>
       limit(async () => {
@@ -70,9 +69,7 @@ module.exports = async (req, res) => {
           const detail = await getEventDetails(event.id, headers);
           const scheduleUrl = detail?.competitions?.[0]?.standardScheduleUrl;
 
-          if (!scheduleUrl) {
-            throw new Error("Missing standardScheduleUrl");
-          }
+          if (!scheduleUrl) throw new Error("Missing standardScheduleUrl");
 
           const groups = await scrapeGroupsFromSchedule(scheduleUrl);
 
@@ -94,7 +91,12 @@ module.exports = async (req, res) => {
 
     res.status(200).json(results);
   } catch (err) {
-    console.error("Top-level error:", err.message);
+    console.error("Top-level error:", {
+      message: err.message,
+      stack: err.stack,
+      responseStatus: err.response?.status,
+      responseData: err.response?.data
+    });
     res.status(500).json({ error: "Failed to load event data" });
   }
 };
