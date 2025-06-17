@@ -28,11 +28,24 @@ module.exports = async (req, res) => {
   try {
     const token = await getToken();
     const headers = { Authorization: `Bearer ${token}` };
+    const seasonId = req.query.id;
 
-    const seasonsRes = await axios.get("https://api.competitionsuite.com/v3/seasons", { headers });
-    const seasons = seasonsRes.data.data
-      .sort((a, b) => b.name.localeCompare(a.name))
-      .slice(0, 1);
+    let seasons = [];
+
+    if (seasonId) {
+      // Use manually requested season
+      const seasonRes = await axios.get(
+        `https://api.competitionsuite.com/v3/seasons/${seasonId}`,
+        { headers }
+      );
+      seasons = [seasonRes.data.data];
+    } else {
+      // Default: use most recent season
+      const seasonsRes = await axios.get("https://api.competitionsuite.com/v3/seasons", { headers });
+      seasons = seasonsRes.data.data
+        .sort((a, b) => b.name.localeCompare(a.name))
+        .slice(0, 1);
+    }
 
     const eventsBySeason = await Promise.all(
       seasons.map(async season => {
