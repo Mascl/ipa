@@ -76,6 +76,7 @@ module.exports = async (req, res) => {
           return {
             id: event.id,
             name: event.name,
+            url: scheduleUrl,
             groups
           };
         } catch (err) {
@@ -83,6 +84,7 @@ module.exports = async (req, res) => {
           return {
             id: event.id,
             name: event.name,
+            url: scheduleUrl || null,
             error: err.message
           };
         }
