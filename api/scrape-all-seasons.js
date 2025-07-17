@@ -20,7 +20,7 @@ async function getToken() {
 
 async function getAllSeasons(headers) {
   const res = await axios.get("https://api.competitionsuite.com/v3/seasons", { headers });
-  return res.data.data.sort((a, b) => b.name.localeCompare(a.name));
+  return res.data.data.sort((a, b) => b.name.localeCompare(a.name)); // most recent first
 }
 
 async function getEvents(seasonId, headers) {
@@ -101,6 +101,7 @@ module.exports = async (req, res) => {
         ));
 
         const filename = `events-with-groups/${seasonName}.json`;
+
         await put(filename, JSON.stringify(results), {
           access: "public"
         });

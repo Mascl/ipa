@@ -51,15 +51,24 @@ async function scrapeGroupsFromSchedule(url) {
 module.exports = async (req, res) => {
   const { default: pLimit } = await import("p-limit");
 
-  let seasonId = req.query.seasonId;
-  if (!seasonId) {
-    const season = await getMostRecentSeason(headers);
-    seasonId = season.id;
-  }
-
   try {
     const token = await getToken();
     const headers = { Authorization: `Bearer ${token}` };
+
+    let seasonId = req.query.seasonId;
+    let seasonName = "";
+
+    if (seasonId) {
+      const seasonRes = await axios.get(
+        `https://api.competitionsuite.com/v3/seasons/${seasonId}`,
+        { headers }
+      );
+      seasonName = seasonRes.data.name;
+    } else {
+      const mostRecent = await getMostRecentSeason(headers);
+      seasonId = mostRecent.id;
+      seasonName = mostRecent.name;
+    }
 
     const events = await getEvents(seasonId, headers);
     const limit = pLimit(3);
@@ -90,13 +99,13 @@ module.exports = async (req, res) => {
       })
     ));
 
-    // 🧠 Save to blob
-    const filename = `events-with-groups/${seasonId}.json`;
+    // Use season name for the filename
+    const filename = `events-with-groups/${seasonName}.json`;
     const { url } = await put(filename, JSON.stringify(results), {
       access: "public"
     });
 
-    res.status(200).json({ message: "Scraped and cached", blobUrl: url });
+    res.status(200).json({ message: `Scraped ${seasonName}`, blobUrl: url });
   } catch (err) {
     console.error("Scrape error:", err.message);
     res.status(500).json({ error: "Scrape failed" });
