@@ -1,3 +1,16 @@
+/*
+This endpoint creates  single file (events-with-groups/all-seasons.json) with an array of season objects, where each season has:
+  - id
+  - name
+  - an array of events, and each event contains:
+     - id
+     - name
+     - url (schedule)
+     - recapUrl
+     - groups (if parsed)
+     - error (optional, if scraping failed)
+*/
+
 const axios = require("axios");
 const cheerio = require("cheerio");
 const { put } = require("@vercel/blob");
@@ -61,7 +74,7 @@ module.exports = async (req, res) => {
   const { default: pLimit } = await import("p-limit");
   const limit = pLimit(3);
 
-  const updated = [];
+  const allSeasons = [];
   const skipped = [];
 
   try {
@@ -82,11 +95,11 @@ module.exports = async (req, res) => {
           continue;
         }
 
-        const results = await Promise.all(events.map(event =>
+        const enrichedEvents = await Promise.all(events.map(event =>
           limit(async () => {
             try {
               const detail = await getEventDetails(event.id, headers);
-              const scheduleUrl = detail?.competitions?.[0]?.standardScheduleUrl;
+              const scheduleUrl = detail?.competitions?.[0]?.standardScheduleUrl ?? null;
               const recapUrl = detail?.competitions?.[0]?.recapUrl
                 ? await checkRecapAvailable(detail.competitions[0].recapUrl)
                 : "";
@@ -96,7 +109,7 @@ module.exports = async (req, res) => {
               return {
                 id: event.id,
                 name: event.name,
-                url: scheduleUrl,
+                scheduleUrl,
                 recapUrl,
                 groups
               };
@@ -104,7 +117,7 @@ module.exports = async (req, res) => {
               return {
                 id: event.id,
                 name: event.name,
-                url: null,
+                scheduleUrl: null,
                 recapUrl: "",
                 error: err.message
               };
@@ -112,23 +125,28 @@ module.exports = async (req, res) => {
           })
         ));
 
-        const filename = `events-with-groups/${seasonName}.json`;
-
-        await put(filename, JSON.stringify(results), {
-          access: "public"
+        allSeasons.push({
+          id: seasonId,
+          name: seasonName,
+          events: enrichedEvents
         });
 
-        console.log(`✅ Scraped and saved: ${seasonName}`);
-        updated.push(seasonName);
+        console.log(`✅ Added season: ${seasonName}`);
       } catch (err) {
         console.warn(`❌ Failed to scrape ${seasonName}:`, err.message);
         skipped.push(seasonName);
       }
     }
 
-    res.status(200).json({ updated, skipped });
+    // Save one combined blob
+    const filename = `events-with-groups/all-seasons.json`;
+    const { url } = await put(filename, JSON.stringify(allSeasons), {
+      access: "public"
+    });
+
+    res.status(200).json({ message: "Scraped and saved all seasons", blobUrl: url, skipped });
   } catch (err) {
     console.error("Top-level error:", err.message);
-    res.status(500).json({ error: "Scraping failed", updated, skipped });
+    res.status(500).json({ error: "Scraping failed", skipped });
   }
 };
