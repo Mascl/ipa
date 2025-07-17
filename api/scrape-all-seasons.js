@@ -7,7 +7,10 @@ This endpoint creates a single file (events-with-groups/all-seasons.json) with a
      - name
      - scheduleUrl
      - recapUrl
-     - groups (if parsed), each with name, class, and optional groupId
+     - groups (if parsed), each with:
+        - name
+        - class
+        - groupId (if matched)
      - error (optional, if scraping failed)
 */
 
@@ -37,7 +40,7 @@ async function getToken() {
 
 async function getAllSeasons(headers) {
   const res = await axios.get("https://api.competitionsuite.com/v3/seasons", { headers });
-  return res.data.data.sort((a, b) => b.name.localeCompare(a.name)); // most recent first
+  return res.data.data.sort((a, b) => b.name.localeCompare(a.name));
 }
 
 async function getEvents(seasonId, headers) {
@@ -50,11 +53,6 @@ async function getEventDetails(eventId, headers) {
   return res.data;
 }
 
-async function getSeasonGroups(seasonId, headers) {
-  const res = await axios.get(`https://api.competitionsuite.com/v3/groups?seasonId=${seasonId}`, { headers });
-  return res.data.data;
-}
-
 async function scrapeGroupsFromSchedule(url, groupMap) {
   const res = await axios.get(url);
   const $ = cheerio.load(res.data);
@@ -62,30 +60,29 @@ async function scrapeGroupsFromSchedule(url, groupMap) {
   const groups = [];
 
   rows.each((_, el) => {
-    const nameRaw = $(el).find(".schedule-row__name").text().trim();
+    const name = $(el).find(".schedule-row__name").text().trim();
     const cls = $(el).find(".schedule-row__initials").text().trim();
-    const normName = normalizeGroupName(nameRaw);
-    const groupId = groupMap[normName];
+    const normalized = normalizeGroupName(name);
+    const groupId = groupMap[normalized] || null;
 
-    if (nameRaw && cls) {
-      groups.push({ name: nameRaw, class: cls, ...(groupId && { groupId }) });
+    if (name && cls) {
+      groups.push({ name, class: cls, groupId });
     }
   });
 
   return groups;
 }
 
-async function getRecapUrl(competitions = []) {
-  const recapUrl = competitions[0]?.recapUrl;
-  if (!recapUrl) return "";
+async function getGroupMapForSeason(seasonId, headers) {
+  const res = await axios.get(`https://api.competitionsuite.com/v3/groups?seasonId=${seasonId}`, {
+    headers
+  });
 
-  try {
-    const res = await axios.get(recapUrl);
-    if (res.data.includes("not available")) return "";
-    return recapUrl;
-  } catch {
-    return "";
+  const map = {};
+  for (const g of res.data.data) {
+    map[normalizeGroupName(g.name)] = g.id;
   }
+  return map;
 }
 
 module.exports = async (req, res) => {
@@ -95,6 +92,7 @@ module.exports = async (req, res) => {
   try {
     const token = await getToken();
     const headers = { Authorization: `Bearer ${token}` };
+
     const seasons = await getAllSeasons(headers);
     const allSeasons = [];
 
@@ -103,31 +101,51 @@ module.exports = async (req, res) => {
       const seasonName = season.name;
 
       try {
+        const groupMap = await getGroupMapForSeason(seasonId, headers);
         const events = await getEvents(seasonId, headers);
-        if (!events.length) continue;
 
-        const groupsFromApi = await getSeasonGroups(seasonId, headers);
-        const groupMap = {};
-        for (const g of groupsFromApi) {
-          groupMap[normalizeGroupName(g.name)] = g.id;
+        if (!Array.isArray(events) || events.length === 0) {
+          console.log(`Skipping ${seasonName} — no events`);
+          continue;
         }
 
-        const enriched = await Promise.all(events.map(event =>
+        const eventData = await Promise.all(events.map(event =>
           limit(async () => {
             try {
               const detail = await getEventDetails(event.id, headers);
               const scheduleUrl = detail?.competitions?.[0]?.standardScheduleUrl || null;
-              const recapUrl = await getRecapUrl(detail?.competitions || []);
-              const groups = scheduleUrl
-                ? await scrapeGroupsFromSchedule(scheduleUrl, groupMap)
-                : [];
+              const recapUrl = detail?.competitions?.[0]?.recapUrl || null;
+
+              let groups = [];
+
+              if (scheduleUrl) {
+                try {
+                  groups = await scrapeGroupsFromSchedule(scheduleUrl, groupMap);
+                } catch (err) {
+                  console.warn(`❌ Error scraping schedule for event ${event.id}:`, err.message);
+                }
+              }
+
+              let finalRecapUrl = recapUrl;
+
+              if (recapUrl) {
+                try {
+                  const recapRes = await axios.get(recapUrl);
+                  if (recapRes.data?.includes("not available")) {
+                    finalRecapUrl = "";
+                  }
+                } catch (err) {
+                  console.warn(`⚠️ Recap fetch failed for event ${event.id}:`, err.message);
+                  finalRecapUrl = "";
+                }
+              }
 
               return {
                 id: event.id,
                 name: event.name,
                 scheduleUrl,
-                recapUrl,
-                ...(groups.length ? { groups } : {})
+                recapUrl: finalRecapUrl,
+                groups
               };
             } catch (err) {
               return {
@@ -144,10 +162,12 @@ module.exports = async (req, res) => {
         allSeasons.push({
           id: seasonId,
           name: seasonName,
-          events: enriched
+          events: eventData
         });
+
+        console.log(`✅ Season ${seasonName} scraped`);
       } catch (err) {
-        console.warn(`Skipping ${seasonName}:`, err.message);
+        console.warn(`❌ Failed to scrape ${seasonName}:`, err.message);
       }
     }
 
@@ -156,7 +176,7 @@ module.exports = async (req, res) => {
       allowOverwrite: true
     });
 
-    res.status(200).json({ message: "Scraped all seasons and stored in blob", count: allSeasons.length });
+    res.status(200).json({ message: "Scrape complete", seasons: allSeasons.length });
   } catch (err) {
     console.error("Top-level error:", err.message);
     res.status(500).json({ error: "Scraping failed" });
