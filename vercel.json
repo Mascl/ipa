@@ -1,4 +1,14 @@
 {
   "version": 2,
-  "builds": [{ "src": "api/*.js", "use": "@vercel/node" }]
+  "builds": [{ "src": "api/*.js", "use": "@vercel/node" }],
+  "crons": [
+    {
+      "path": "/api/scrape-events.js",
+      "schedule": "0 4 * * *"
+    },
+    {
+      "path": "/api/scrape-all-seasons.js",
+      "schedule": "0 4 1 * *"
+    }
+  ]
 }
