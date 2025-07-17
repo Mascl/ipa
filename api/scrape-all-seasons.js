@@ -48,6 +48,15 @@ async function scrapeGroupsFromSchedule(url) {
   return groups;
 }
 
+async function checkRecapAvailable(url) {
+  try {
+    const res = await axios.get(url);
+    return res.data.includes("not available") ? "" : url;
+  } catch (err) {
+    return "";
+  }
+}
+
 module.exports = async (req, res) => {
   const { default: pLimit } = await import("p-limit");
   const limit = pLimit(3);
@@ -78,15 +87,17 @@ module.exports = async (req, res) => {
             try {
               const detail = await getEventDetails(event.id, headers);
               const scheduleUrl = detail?.competitions?.[0]?.standardScheduleUrl;
+              const recapUrl = detail?.competitions?.[0]?.recapUrl
+                ? await checkRecapAvailable(detail.competitions[0].recapUrl)
+                : "";
 
-              if (!scheduleUrl) throw new Error("Missing standardScheduleUrl");
-
-              const groups = await scrapeGroupsFromSchedule(scheduleUrl);
+              const groups = scheduleUrl ? await scrapeGroupsFromSchedule(scheduleUrl) : [];
 
               return {
                 id: event.id,
                 name: event.name,
                 url: scheduleUrl,
+                recapUrl,
                 groups
               };
             } catch (err) {
@@ -94,6 +105,7 @@ module.exports = async (req, res) => {
                 id: event.id,
                 name: event.name,
                 url: null,
+                recapUrl: "",
                 error: err.message
               };
             }
