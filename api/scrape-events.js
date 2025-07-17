@@ -23,6 +23,11 @@ async function getMostRecentSeason(headers) {
   return res.data.data.sort((a, b) => b.name.localeCompare(a.name))[0];
 }
 
+async function getSeasonById(seasonId, headers) {
+  const res = await axios.get(`https://api.competitionsuite.com/v3/seasons/${seasonId}`, { headers });
+  return res.data;
+}
+
 async function getEvents(seasonId, headers) {
   const res = await axios.get(`https://api.competitionsuite.com/v3/events?seasonId=${seasonId}`, { headers });
   return res.data.data;
@@ -55,15 +60,13 @@ module.exports = async (req, res) => {
     const token = await getToken();
     const headers = { Authorization: `Bearer ${token}` };
 
+    // Resolve seasonId and name
     let seasonId = req.query.seasonId;
     let seasonName = "";
 
     if (seasonId) {
-      const seasonRes = await axios.get(
-        `https://api.competitionsuite.com/v3/seasons/${seasonId}`,
-        { headers }
-      );
-      seasonName = seasonRes.data.name;
+      const season = await getSeasonById(seasonId, headers);
+      seasonName = season.name;
     } else {
       const mostRecent = await getMostRecentSeason(headers);
       seasonId = mostRecent.id;
@@ -99,15 +102,28 @@ module.exports = async (req, res) => {
       })
     ));
 
-    // Use season name for the filename
+    // Save to Blob using season name (e.g., 2025.json)
     const filename = `events-with-groups/${seasonName}.json`;
     const { url } = await put(filename, JSON.stringify(results), {
       access: "public"
     });
 
-    res.status(200).json({ message: `Scraped ${seasonName}`, blobUrl: url });
+    res.status(200).json({
+      message: `Scraped season ${seasonName}`,
+      blobUrl: url
+    });
   } catch (err) {
-    console.error("Scrape error:", err.message);
-    res.status(500).json({ error: "Scrape failed" });
+    console.error("Scrape error:", {
+      message: err.message,
+      stack: err.stack,
+      response: err.response?.data,
+      status: err.response?.status
+    });
+
+    res.status(500).json({
+      error: "Scrape failed",
+      message: err.message,
+      stack: err.stack
+    });
   }
 };
