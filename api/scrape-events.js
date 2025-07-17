@@ -18,6 +18,11 @@ async function getToken() {
   return res.data.access_token;
 }
 
+async function getMostRecentSeason(headers) {
+  const res = await axios.get("https://api.competitionsuite.com/v3/seasons", { headers });
+  return res.data.data.sort((a, b) => b.name.localeCompare(a.name))[0];
+}
+
 async function getEvents(seasonId, headers) {
   const res = await axios.get(`https://api.competitionsuite.com/v3/events?seasonId=${seasonId}`, { headers });
   return res.data.data;
@@ -46,9 +51,10 @@ async function scrapeGroupsFromSchedule(url) {
 module.exports = async (req, res) => {
   const { default: pLimit } = await import("p-limit");
 
-  const seasonId = req.query.seasonId;
+  let seasonId = req.query.seasonId;
   if (!seasonId) {
-    return res.status(400).json({ error: "Missing seasonId" });
+    const season = await getMostRecentSeason(headers);
+    seasonId = season.id;
   }
 
   try {
