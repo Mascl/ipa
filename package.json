@@ -10,6 +10,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@vercel/blob": "^1.1.1",
     "axios": "^1.10.0",
     "cheerio": "^1.1.0",
     "p-limit": "^6.2.0"
