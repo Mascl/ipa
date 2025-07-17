@@ -158,6 +158,7 @@ module.exports = async (req, res) => {
 
     const { url } = await put("events-with-groups/all-seasons.json", JSON.stringify(seasonsOutput), {
       access: "public",
+      allowOverwrite: true
     });
 
     res.status(200).json({ message: "Scrape complete", blobUrl: url });
