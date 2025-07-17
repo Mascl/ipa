@@ -1,13 +1,13 @@
 /*
-This endpoint creates  single file (events-with-groups/all-seasons.json) with an array of season objects, where each season has:
+This endpoint creates a single file (events-with-groups/all-seasons.json) with an array of season objects, where each season has:
   - id
   - name
   - an array of events, and each event contains:
      - id
      - name
-     - url (schedule)
+     - scheduleUrl
      - recapUrl
-     - groups (if parsed)
+     - groups (if parsed), with groupId included where matched
      - error (optional, if scraping failed)
 */
 
@@ -24,7 +24,7 @@ async function getToken() {
     new URLSearchParams({
       grant_type: "client_credentials",
       client_id: CLIENT_ID,
-      client_secret: CLIENT_SECRET
+      client_secret: CLIENT_SECRET,
     }),
     { headers: { "Content-Type": "application/x-www-form-urlencoded" } }
   );
@@ -38,6 +38,11 @@ async function getAllSeasons(headers) {
 
 async function getEvents(seasonId, headers) {
   const res = await axios.get(`https://api.competitionsuite.com/v3/events?seasonId=${seasonId}`, { headers });
+  return res.data.data;
+}
+
+async function getGroups(seasonId, headers) {
+  const res = await axios.get(`https://api.competitionsuite.com/v3/groups?seasonId=${seasonId}`, { headers });
   return res.data.data;
 }
 
@@ -61,11 +66,13 @@ async function scrapeGroupsFromSchedule(url) {
   return groups;
 }
 
-async function checkRecapAvailable(url) {
+async function checkRecapUrl(url) {
   try {
     const res = await axios.get(url);
-    return res.data.includes("not available") ? "" : url;
-  } catch (err) {
+    const $ = cheerio.load(res.data);
+    const bodyText = $("body").text();
+    return bodyText.includes("not available") ? "" : url;
+  } catch {
     return "";
   }
 }
@@ -73,9 +80,7 @@ async function checkRecapAvailable(url) {
 module.exports = async (req, res) => {
   const { default: pLimit } = await import("p-limit");
   const limit = pLimit(3);
-
-  const allSeasons = [];
-  const skipped = [];
+  const seasonsOutput = [];
 
   try {
     const token = await getToken();
@@ -84,69 +89,80 @@ module.exports = async (req, res) => {
     const seasons = await getAllSeasons(headers);
 
     for (const season of seasons) {
-      const seasonId = season.id;
-      const seasonName = season.name;
-
       try {
+        const seasonId = season.id;
+        const seasonName = season.name;
+
         const events = await getEvents(seasonId, headers);
         if (!Array.isArray(events) || events.length === 0) {
           console.log(`Skipping ${seasonName} — no events`);
-          skipped.push(seasonName);
           continue;
         }
 
-        const enrichedEvents = await Promise.all(events.map(event =>
-          limit(async () => {
-            try {
-              const detail = await getEventDetails(event.id, headers);
-              const scheduleUrl = detail?.competitions?.[0]?.standardScheduleUrl ?? null;
-              const recapUrl = detail?.competitions?.[0]?.recapUrl
-                ? await checkRecapAvailable(detail.competitions[0].recapUrl)
-                : "";
+        const groupList = await getGroups(seasonId, headers);
+        const groupMap = new Map(
+          groupList.map(g => [g.name.toLowerCase(), g.id])
+        );
 
-              const groups = scheduleUrl ? await scrapeGroupsFromSchedule(scheduleUrl) : [];
+        const eventResults = await Promise.all(
+          events.map(event =>
+            limit(async () => {
+              try {
+                const detail = await getEventDetails(event.id, headers);
+                const competition = detail?.competitions?.[0];
+                const scheduleUrl = competition?.standardScheduleUrl || null;
+                const recapUrlRaw = competition?.recapUrl || "";
+                const recapUrl = recapUrlRaw ? await checkRecapUrl(recapUrlRaw) : "";
 
-              return {
-                id: event.id,
-                name: event.name,
-                scheduleUrl,
-                recapUrl,
-                groups
-              };
-            } catch (err) {
-              return {
-                id: event.id,
-                name: event.name,
-                scheduleUrl: null,
-                recapUrl: "",
-                error: err.message
-              };
-            }
-          })
-        ));
+                let groups = [];
 
-        allSeasons.push({
+                if (scheduleUrl) {
+                  const scrapedGroups = await scrapeGroupsFromSchedule(scheduleUrl);
+                  groups = scrapedGroups.map(g => ({
+                    ...g,
+                    groupId: groupMap.get(g.name.toLowerCase()) || null,
+                  }));
+                }
+
+                return {
+                  id: event.id,
+                  name: event.name,
+                  scheduleUrl,
+                  recapUrl,
+                  groups,
+                };
+              } catch (err) {
+                return {
+                  id: event.id,
+                  name: event.name,
+                  scheduleUrl: null,
+                  recapUrl: "",
+                  error: err.message,
+                };
+              }
+            })
+          )
+        );
+
+        seasonsOutput.push({
           id: seasonId,
           name: seasonName,
-          events: enrichedEvents
+          events: eventResults,
         });
 
-        console.log(`✅ Added season: ${seasonName}`);
+        console.log(`✅ Scraped: ${seasonName}`);
       } catch (err) {
-        console.warn(`❌ Failed to scrape ${seasonName}:`, err.message);
-        skipped.push(seasonName);
+        console.warn(`❌ Failed to process season ${season.name}:`, err.message);
       }
     }
 
-    // Save one combined blob
-    const filename = `events-with-groups/all-seasons.json`;
-    const { url } = await put(filename, JSON.stringify(allSeasons), {
-      access: "public"
+    const { url } = await put("events-with-groups/all-seasons.json", JSON.stringify(seasonsOutput), {
+      access: "public",
     });
 
-    res.status(200).json({ message: "Scraped and saved all seasons", blobUrl: url, skipped });
+    res.status(200).json({ message: "Scrape complete", blobUrl: url });
   } catch (err) {
     console.error("Top-level error:", err.message);
-    res.status(500).json({ error: "Scraping failed", skipped });
+    res.status(500).json({ error: "Scraping failed" });
   }
 };
