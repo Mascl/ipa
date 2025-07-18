@@ -75,9 +75,6 @@ async function checkRecapUrl(url) {
   try {
     const res = await axios.get(url);
     const isUnavailable = res.data.includes("not available");
-    console.log("Checked recap URL:", url);
-    console.log("Recap page content length:", res.data.length);
-    console.log("Is unavailable:", isUnavailable);
     return isUnavailable ? "" : url;
   } catch (err) {
     console.warn("Failed to fetch recap URL:", url, err.message);
