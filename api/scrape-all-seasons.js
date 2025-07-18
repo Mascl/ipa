@@ -1,5 +1,12 @@
+const axios = require("axios");
+const cheerio = require("cheerio");
+const { put } = require("@vercel/blob");
+
+const CLIENT_ID = process.env.CLIENT_ID;
+const CLIENT_SECRET = process.env.CLIENT_SECRET;
+
 /*
-This endpoint creates a single file (all-seasons.json) with an array of season objects, where each season has:
+This endpoint creates a single file (events-with-groups/all-seasons.json) with an array of season objects, where each season has:
   - id
   - name
   - an array of events, and each event contains:
@@ -10,17 +17,6 @@ This endpoint creates a single file (all-seasons.json) with an array of season o
      - groups (if parsed), each with name, class, and groupId
      - error (optional, if scraping failed)
 */
-
-const axios = require("axios");
-const cheerio = require("cheerio");
-const { put } = require("@vercel/blob");
-
-const CLIENT_ID = process.env.CLIENT_ID;
-const CLIENT_SECRET = process.env.CLIENT_SECRET;
-
-function normalizeGroupName(name) {
-  return name.toLowerCase().replace(/\s+/g, " ").trim();
-}
 
 async function getToken() {
   const res = await axios.post(
@@ -37,7 +33,7 @@ async function getToken() {
 
 async function getAllSeasons(headers) {
   const res = await axios.get("https://api.competitionsuite.com/v3/seasons", { headers });
-  return res.data.data.sort((a, b) => b.name.localeCompare(a.name)); // most recent first
+  return res.data.data.sort((a, b) => b.name.localeCompare(a.name));
 }
 
 async function getEvents(seasonId, headers) {
@@ -53,13 +49,13 @@ async function getEventDetails(eventId, headers) {
 async function getGroupMapForSeason(seasonId, headers) {
   const res = await axios.get(`https://api.competitionsuite.com/v3/groups?seasonId=${seasonId}`, { headers });
   const map = {};
-  for (const g of res.data.data) {
-    map[normalizeGroupName(g.name)] = g.id;
+  for (const group of res.data.data) {
+    map[group.name.toLowerCase().replace(/\s*\([^)]*\)/g, "").trim()] = group.id;
   }
   return map;
 }
 
-async function scrapeGroupsFromSchedule(url, groupMap) {
+async function scrapeGroupsFromSchedule(url) {
   const res = await axios.get(url);
   const $ = cheerio.load(res.data);
   const rows = $(".schedule-row");
@@ -68,21 +64,18 @@ async function scrapeGroupsFromSchedule(url, groupMap) {
   rows.each((_, el) => {
     const name = $(el).find(".schedule-row__name").text().trim();
     const cls = $(el).find(".schedule-row__initials").text().trim();
-    const normalized = normalizeGroupName(name);
-    const groupId = groupMap[normalized] || null;
-    if (name && cls) groups.push({ name, class: cls, groupId });
+    if (name && cls) groups.push({ name, class: cls });
   });
 
   return groups;
 }
 
-async function getRecapUrl(eventId) {
-  const url = `https://recaps.competitionsuite.com/${eventId}.htm`;
+async function validateRecapUrl(url) {
   try {
     const res = await axios.get(url);
     if (res.data.includes("not available")) return "";
     return url;
-  } catch (err) {
+  } catch {
     return "";
   }
 }
@@ -90,31 +83,46 @@ async function getRecapUrl(eventId) {
 module.exports = async (req, res) => {
   const { default: pLimit } = await import("p-limit");
   const limit = pLimit(3);
-  const seasonsOutput = [];
+
+  const updated = [];
+  const skipped = [];
+  const output = [];
 
   try {
     const token = await getToken();
     const headers = { Authorization: `Bearer ${token}` };
+
     const seasons = await getAllSeasons(headers);
 
     for (const season of seasons) {
-      const { id: seasonId, name: seasonName } = season;
       try {
-        const events = await getEvents(seasonId, headers);
-        if (!Array.isArray(events) || events.length === 0) continue;
+        const events = await getEvents(season.id, headers);
+        if (!Array.isArray(events) || events.length === 0) {
+          skipped.push(season.name);
+          continue;
+        }
 
-        const groupMap = await getGroupMapForSeason(seasonId, headers);
+        const groupMap = await getGroupMapForSeason(season.id, headers);
 
-        const processed = await Promise.all(events.map(event =>
+        const enrichedEvents = await Promise.all(events.map(event =>
           limit(async () => {
             try {
               const detail = await getEventDetails(event.id, headers);
               const scheduleUrl = detail?.competitions?.[0]?.standardScheduleUrl || null;
-              const recapUrl = await getRecapUrl(event.id);
+              const recapCandidate = detail?.competitions?.[0]?.standardRecapUrl || null;
+              const recapUrl = recapCandidate ? await validateRecapUrl(recapCandidate) : "";
 
-              const groups = scheduleUrl
-                ? await scrapeGroupsFromSchedule(scheduleUrl, groupMap)
-                : [];
+              let groups = [];
+              if (scheduleUrl) {
+                const rawGroups = await scrapeGroupsFromSchedule(scheduleUrl);
+                groups = rawGroups.map(g => {
+                  const key = g.name.toLowerCase().replace(/\s*\([^)]*\)/g, "").trim();
+                  return {
+                    ...g,
+                    groupId: groupMap[key] || null
+                  };
+                });
+              }
 
               return {
                 id: event.id,
@@ -135,37 +143,26 @@ module.exports = async (req, res) => {
           })
         ));
 
-        seasonsOutput.push({
-          id: seasonId,
-          name: seasonName,
-          events: processed
+        output.push({
+          id: season.id,
+          name: season.name,
+          events: enrichedEvents
         });
+
+        updated.push(season.name);
       } catch (err) {
-        console.warn(`❌ Failed to scrape season ${seasonName}:`, err.message);
+        skipped.push(season.name);
       }
     }
 
-    const blobHeader = `/*
-This endpoint creates a single file (all-seasons.json) with an array of season objects, where each season has:
-  - id
-  - name
-  - an array of events, and each event contains:
-     - id
-     - name
-     - scheduleUrl
-     - recapUrl
-     - groups (if parsed), each with name, class, and groupId
-     - error (optional, if scraping failed)
-*/\n`;
-
-    await put("all-seasons.json", JSON.stringify(seasonsOutput), {
+    await put("events-with-groups/all-seasons.json", JSON.stringify(output), {
       access: "public",
       allowOverwrite: true
     });
 
-    res.status(200).json({ message: "Scrape complete", seasons: seasonsOutput.length });
+    res.status(200).json({ updated, skipped });
   } catch (err) {
     console.error("Top-level error:", err.message);
-    res.status(500).json({ error: "Scraping failed" });
+    res.status(500).json({ error: "Scraping failed", updated, skipped });
   }
 };
