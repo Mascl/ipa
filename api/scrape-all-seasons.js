@@ -52,7 +52,6 @@ async function getEventDetails(eventId, headers) {
 
 async function getGroupMapForSeason(seasonId, headers) {
   const res = await axios.get(`https://api.competitionsuite.com/v3/groups?seasonId=${seasonId}`, { headers });
-  console.log(res.data.data);
   const map = {};
   for (const g of res.data.data) {
     map[normalizeGroupName(g.name)] = g.id;
