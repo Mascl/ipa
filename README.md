@@ -88,3 +88,15 @@ _To do: add real event data structure_
     "events": []
   }
 ]```
+
+## Bridging CompSuite events to Squarespace events
+This bridge is made via the `Source URL` field in the Squarespace event details.
+1. Go to the Events collection in Squarespace
+2. Click through to the individual event
+3. Hover the three dots and click Settings
+4. In the Content tab, scroll down to the Source URL 
+5. Paste the __standard schedule URL__ here, _e.g. https://schedules.competitionsuite.com/73f88055-d0cf-4fc6-833b-886a314e447b_standard.htm_
+
+Two instances rely on this bridge:
+1. On the event detail page, feed the registered groups
+2. On the group detail page, create the "View details" link
