@@ -54,7 +54,32 @@ _To do: add real event data structure_
         "scheduleUrl": null,
         "recapUrl": "",
         "error": "Request failed with status code 403"
-      }
+      },
+      //past event
+      //has both a scheduleUrl and a recapUrl
+      {
+        "id": 33476,
+        "name": "Week 1: Warren Central HS Invitational",
+        "scheduleUrl": "https://schedules.competitionsuite.com/73f88055-d0cf-4fc6-833b-886a314e447b_standard.htm",
+        "recapUrl": "https://recaps.competitionsuite.com/73f88055-d0cf-4fc6-833b-886a314e447b.htm",
+        "groups": [
+          {
+            "name": "Owen Valley High School Winter Percussion",
+            "class": "PRA",
+            "groupId": 17134
+          },
+          {
+            "name": "North Harrison Indoor Percussion",
+            "class": "PRA",
+            "groupId": 17187
+          },
+          {
+            "name": "Terre Haute South Indoor Percussion",
+            "class": "PRA",
+            "groupId": 17120
+          }
+        ]
+      },
     ]
   },
   {
