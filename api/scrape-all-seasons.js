@@ -79,7 +79,7 @@ async function getGroupMapForSeason(seasonId, headers) {
   });
 
   const map = {};
-  for (const g of res.data.data) {
+  for (const g of res.data) {
     map[normalizeGroupName(g.name)] = g.id;
   }
   return map;
