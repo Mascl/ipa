@@ -1,5 +1,5 @@
 /*
-This endpoint creates a single file (events-with-groups/all-seasons.json) with an array of season objects, where each season has:
+This endpoint creates a single file (all-seasons.json) with an array of season objects, where each season has:
   - id
   - name
   - an array of events, and each event contains:
@@ -146,7 +146,7 @@ module.exports = async (req, res) => {
     }
 
     const blobHeader = `/*
-This endpoint creates a single file (events-with-groups/all-seasons.json) with an array of season objects, where each season has:
+This endpoint creates a single file (all-seasons.json) with an array of season objects, where each season has:
   - id
   - name
   - an array of events, and each event contains:
@@ -158,7 +158,7 @@ This endpoint creates a single file (events-with-groups/all-seasons.json) with a
      - error (optional, if scraping failed)
 */\n`;
 
-    await put("events-with-groups/all-seasons.json", JSON.stringify(seasonsOutput), {
+    await put("all-seasons.json", JSON.stringify(seasonsOutput), {
       access: "public",
       allowOverwrite: true
     });

@@ -1,5 +1,5 @@
 /*
-This endpoint creates a single file (events-with-groups/current-season.json) with one season object, where each season has:
+This endpoint creates a single file (current-season.json) with one season object, where each season has:
   - id
   - name
   - an array of events, and each event contains:
@@ -134,7 +134,7 @@ module.exports = async (req, res) => {
       }
     ];
 
-    const { url } = await put("events-with-groups/current-season.json", JSON.stringify(payload), {
+    const { url } = await put("current-season.json", JSON.stringify(payload), {
       access: "public",
       token: process.env.BLOB_READ_WRITE_TOKEN,
       allowOverwrite: true
