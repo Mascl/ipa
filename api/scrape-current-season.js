@@ -1,5 +1,5 @@
 /*
-This endpoint creates a single file (current-season.json) with one season object, where each season has:
+This endpoint creates a single file (current-season.json) with an array containing the most recent season object. Each season has:
   - id
   - name
   - an array of events, and each event contains:
@@ -33,7 +33,18 @@ async function getToken() {
 
 async function getMostRecentSeason(headers) {
   const res = await axios.get("https://api.competitionsuite.com/v3/seasons", { headers });
-  return res.data.data.sort((a, b) => b.name.localeCompare(a.name))[0];
+  const seasons = res.data.data.sort((a, b) => b.name.localeCompare(a.name));
+  return seasons[0];
+}
+
+async function getGroupsForSeason(seasonId, headers) {
+  const res = await axios.get(`https://api.competitionsuite.com/v3/groups?seasonId=${seasonId}`, { headers });
+  const map = {};
+  res.data.data.forEach(group => {
+    const normalizedName = group.name.toLowerCase().replace(/\s+/g, " ").trim();
+    map[normalizedName] = group.id;
+  });
+  return map;
 }
 
 async function getEvents(seasonId, headers) {
@@ -61,20 +72,12 @@ async function scrapeGroupsFromSchedule(url) {
   return groups;
 }
 
-async function getGroupMapForSeason(seasonId, headers) {
-  const res = await axios.get(`https://api.competitionsuite.com/v3/groups?seasonId=${seasonId}`, { headers });
-  const map = {};
-  for (const group of res.data.data) {
-    map[group.name.trim().toLowerCase()] = group.id;
-  }
-  return map;
-}
-
 async function checkRecapUrl(url) {
   try {
     const res = await axios.get(url);
-    return res.data.includes("not available") ? "" : url;
-  } catch {
+    const isUnavailable = res.data.includes("not available");
+    return isUnavailable ? "" : url;
+  } catch (err) {
     return "";
   }
 }
@@ -83,66 +86,76 @@ module.exports = async (req, res) => {
   const { default: pLimit } = await import("p-limit");
   const limit = pLimit(3);
 
+  const updated = [];
+  const skipped = [];
+
   try {
     const token = await getToken();
     const headers = { Authorization: `Bearer ${token}` };
 
     const season = await getMostRecentSeason(headers);
-    const events = await getEvents(season.id, headers);
-    const groupMap = await getGroupMapForSeason(season.id, headers);
+    const seasonId = season.id;
+    const seasonName = season.name;
+    const allData = [];
 
-    const eventResults = await Promise.all(events.map(event =>
-      limit(async () => {
-        try {
-          const detail = await getEventDetails(event.id, headers);
-          const scheduleUrl = detail?.competitions?.[0]?.standardScheduleUrl;
-          const recapUrlRaw = detail?.competitions?.[0]?.recapUrl || "";
-          const recapUrl = recapUrlRaw ? await checkRecapUrl(recapUrlRaw) : "";
+    try {
+      const events = await getEvents(seasonId, headers);
+      if (!Array.isArray(events) || events.length === 0) {
+        skipped.push(seasonName);
+      } else {
+        const groupMap = await getGroupsForSeason(seasonId, headers);
 
-          if (!scheduleUrl) throw new Error("Missing standardScheduleUrl");
+        const results = await Promise.all(events.map(event =>
+          limit(async () => {
+            try {
+              const detail = await getEventDetails(event.id, headers);
+              const scheduleUrl = detail?.competitions?.[0]?.standardScheduleUrl || null;
+              const recapUrlRaw = detail?.competitions?.[0]?.recapUrl || null;
+              const recapUrl = recapUrlRaw ? await checkRecapUrl(recapUrlRaw) : "";
 
-          const groups = await scrapeGroupsFromSchedule(scheduleUrl);
-          const enrichedGroups = groups.map(g => ({
-            ...g,
-            groupId: groupMap[g.name.toLowerCase().replace(/ \(.*\)$/, "")] || null
-          }));
+              let groups = [];
+              if (scheduleUrl) {
+                const parsed = await scrapeGroupsFromSchedule(scheduleUrl);
+                groups = parsed.map(g => {
+                  const normalizedName = g.name.toLowerCase().replace(/\s+/g, " ").trim();
+                  const groupId = groupMap[normalizedName] || null;
+                  return { ...g, groupId };
+                });
+              }
 
-          return {
-            id: event.id,
-            name: event.name,
-            scheduleUrl,
-            recapUrl,
-            groups: enrichedGroups
-          };
-        } catch (err) {
-          return {
-            id: event.id,
-            name: event.name,
-            scheduleUrl: null,
-            recapUrl: "",
-            error: err.message
-          };
-        }
-      })
-    ));
+              return {
+                id: event.id,
+                name: event.name,
+                scheduleUrl,
+                recapUrl,
+                groups
+              };
+            } catch (err) {
+              return {
+                id: event.id,
+                name: event.name,
+                scheduleUrl: null,
+                recapUrl: null,
+                error: err.message
+              };
+            }
+          })
+        ));
 
-    const payload = [
-      {
-        id: season.id,
-        name: season.name,
-        events: eventResults
+        allData.push({ id: seasonId, name: seasonName, events: results });
+        updated.push(seasonName);
       }
-    ];
+    } catch (err) {
+      skipped.push(seasonName);
+    }
 
-    const { url } = await put("current-season.json", JSON.stringify(payload), {
+    await put("current-season.json", JSON.stringify(allData), {
       access: "public",
-      token: process.env.BLOB_READ_WRITE_TOKEN,
       allowOverwrite: true
     });
 
-    res.status(200).json({ message: "Scraped current season", blobUrl: url });
+    res.status(200).json({ updated, skipped });
   } catch (err) {
-    console.error("Top-level error:", err.message);
-    res.status(500).json({ error: "Scraping failed" });
+    res.status(500).json({ error: "Scraping failed", updated, skipped });
   }
 };
