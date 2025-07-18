@@ -12,7 +12,7 @@ The current season is selected by being the most recent one
 ## Scraping
 Through blob, we scrape:
 * The current season once per day at 4am UTC: `"schedule": "0 4 * * *"`
-* The past seasons once per month at 4 am UTC: `"schedule": "0 4 1 * *"`
+* The past seasons once per month at 4:15 am UTC: `"schedule": "15 4 1 * *"`
 
 ### Sample data on all-seasons.js
 _To do: add real event data structure_

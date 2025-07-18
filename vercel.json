@@ -3,12 +3,12 @@
   "builds": [{ "src": "api/*.js", "use": "@vercel/node" }],
   "crons": [
     {
-      "path": "/api/scrape-events.js",
+      "path": "/api/scrape-current-season.js",
       "schedule": "0 4 * * *"
     },
     {
       "path": "/api/scrape-all-seasons.js",
-      "schedule": "0 4 1 * *"
+      "schedule": "15 4 1 * *"
     }
   ]
 }
