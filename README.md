@@ -1,13 +1,24 @@
 # CompSuite API connection through Vercel
+This repo connects Vercel to CompetitionSuite. The endpoints and blobs deliver data to Squarespace.
 
-## Endpoints
-* Seasons
+## Endpoints currently in use
+* /api/divisions.js
+* /api/groups.js → creates a list of groups with their info: location, division
+* /api/groups-per-division → creates a list of groups per division
+* /api/scrape-all-seasons.js → creates `all-seasons.json` blob of events with their registered groups & URLs (schedule, recap)
+* /api/scrape-current-seasons.js → creates `current-seasons.json` blob like all-seasons but for most recent season
+
+
+## Endpoints currently _not_ in use
+* /api/season.js _(for scores.html)_
+* /api/group-events.js _(replaced when we created the events-with-groups blob)_
+* /api/scrape-events.js
 
 The current season is selected by being the most recent one
 
 ## Blobs
-* Groups: lists groups with their ID _(through CompSuite API call)_
-* Events-with-groups _(through CompSuite API call + scraping)_
+* all-seasons.js _(through CompSuite API call + scraping)_
+* current-season.js _(through CompSuite API call + scraping)_
 
 ## Scraping
 Through blob, we scrape:
@@ -15,7 +26,6 @@ Through blob, we scrape:
 * The past seasons once per month at 4:15 am UTC: `"schedule": "15 4 1 * *"`
 
 ### Sample data on all-seasons.js
-_To do: add real event data structure_
 ```[
   {
     "id": 14343,
@@ -87,7 +97,8 @@ _To do: add real event data structure_
     "name": "2025",
     "events": []
   }
-]```
+]
+```
 
 ## Bridging CompSuite events to Squarespace events
 This bridge is made via the `Source URL` field in the Squarespace event details.
